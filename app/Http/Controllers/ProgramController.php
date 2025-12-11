@@ -13,6 +13,11 @@ class ProgramController extends Controller
     {
         $data = program::all();
 
+        $data->map(function ($item) {
+            $item->media_url = $item->media ? url('storage/' . $item->media) : null;
+            return $item;
+        });
+
         return response()->json([
             'status' => true,
             'message' => 'Data program berhasil diambil',
@@ -28,7 +33,7 @@ class ProgramController extends Controller
         if (!$data) {
             return response()->json(['status' => false, 'message' => 'Data tidak ditemukan'], 404);
         }
-
+        $data->media_url = $data->media ? url('storage/' . $data->media) : null;
         return response()->json(['status' => true, 'data' => $data]);
     }
 
@@ -43,27 +48,26 @@ class ProgramController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['status' => false, 'errors' => $validator->errors()], 422);
-        }
-
-        $validatedData = $validator->validated();
-
-        if ($request->hasFile('media')) {
-
-            $folder = 'program/' . date('Y') . '/' . date('m') . '/' . date('d');
-            $path = $request->file('media')->store($folder, 'public');
-            $validated['media'] = asset('storage/' . $path);
-           
-    
-        } else {
             return response()->json([
-                'success' => false,
+                'status' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+    
+        $validatedData = $validator->validated();
+    
+        if (!$request->hasFile('media')) {
+            return response()->json([
+                'status' => false,
                 'message' => 'File media wajib dikirim'
             ], 400);
         }
+        $folder = 'program/' . date('Y') . '/' . date('m') . '/' . date('d');
+        $path = $request->file('media')->store($folder, 'public');
+        $validatedData['media'] = $path;
 
         $data = program::create($validatedData);
-
+        $data->media_url = url('storage/' . $data->media);
         return response()->json([
             'status' => true,
             'message' => 'Data berhasil ditambahkan',
