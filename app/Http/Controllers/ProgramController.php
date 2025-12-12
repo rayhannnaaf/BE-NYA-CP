@@ -72,7 +72,6 @@ class ProgramController extends Controller
             'status' => true,
             'message' => 'Data berhasil ditambahkan',
             'data' => $data,
-            'media' => $path
         ], 201);
     }
 
