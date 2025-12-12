@@ -11,10 +11,13 @@ use App\Http\Controllers\AuthController;
 
 
 Route::apiResource('berita', BeritaController::class);
+Route::post('/berita/{id}/update', [BeritaController::class, 'update']);
 Route::apiResource('testimoni', TestimoniController::class);
 Route::apiResource('galeri', GaleriController::class);
+Route::post('/galeri/{id}/update', [BeritaController::class, 'update']);
 Route::apiResource('tentang-kami', TentangkamiController::class);
 Route::apiResource('program', ProgramController::class);
+Route::post('/program/{id}/update', [BeritaController::class, 'update']);
 Route::patch('berita/{id}/status', [BeritaController::class, 'updateStatus']);
 
 Route::get('/sso/callback', [AuthController::class, 'callback']);
