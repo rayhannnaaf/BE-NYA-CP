@@ -74,19 +74,16 @@ class TestimoniController extends Controller
         $validator = Validator::make($request->all(), [
             'nama' => 'required|string|max:255',
             'pesan' => 'required',
+            'rating'    => 'nullable|numeric|min:1|max:5',
+            'status_active' =>'required|integer|in:0,1'
         ]);
 
         if ($validator->fails()) {
             return response()->json(['status' => false, 'errors' => $validator->errors()], 422);
         }
-        $validated = $request->validate([
-            'nama'      => 'required|string|max:255',
-            'pesan' => 'required|string',
-            'rating'    => 'nullable|numeric|min:1|max:5',
-            'status_active' =>'required|integer|in:0,1'
-        ]);
+     
         
-        $data = testimoni::create($validated);
+        $data = testimoni::create($validator ->validated());
         
         return response()->json([
             'status' => true,

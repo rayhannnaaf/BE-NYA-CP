@@ -38,18 +38,19 @@ class GaleriController extends Controller
             'tanggal' => 'nullable|date', 
         ]);
 
-        if ($request->hasFile('media')) {
-
-            $folder = 'galeri/' . date('Y') . '/' . date('m') . '/' . date('d');
-            $path = $request->file('media')->store($folder, 'public');
-            $validated['media'] = asset('storage/' . $path);
-    
-        } else {
+        if (!$request->hasFile('media')) {
             return response()->json([
-                'success' => false,
+                'status'  => false,
                 'message' => 'File media wajib dikirim'
             ], 400);
         }
+    
+
+        $folder = 'galeri/' . date('Y') . '/' . date('m') . '/' . date('d');
+        $path = $request->file('media')->store($folder, 'public');
+        $validated['media'] = $path;
+        $validated['tanggal'] = $validated['tanggal'] ?? now();
+
         $galeri = galeri::create([
             'judul' => $request['judul'],
             'deskripsi' => $request['deskripsi'],
@@ -57,6 +58,8 @@ class GaleriController extends Controller
             'tipe_media' => $request['tipe_media'],
             'tanggal' => $request['tanggal'] ?? now(), 
         ]);
+
+        $galeri->media_url = url('storage/' . $galeri->media);
 
         return response()->json([
             'message' => 'Galeri berhasil disimpan',
