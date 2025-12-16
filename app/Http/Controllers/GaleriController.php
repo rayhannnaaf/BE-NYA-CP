@@ -11,7 +11,10 @@ class GaleriController extends Controller
     public function index()
     {
         $galeri = galeri::all();
-
+        $galeri->map(function ($item) {
+            $item->media_url = $item->media ? url('storage/' . $item->media) : null;
+            return $item;
+        });
         return response()->json([
             'status' => 'success',
             'jumlah' => $galeri->count(),
