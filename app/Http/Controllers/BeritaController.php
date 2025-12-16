@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Storage;
 
 class BeritaController extends Controller
 {
+
     public function index(Request $request)
     {
         $status = $request->query('status');
@@ -228,8 +229,6 @@ class BeritaController extends Controller
     } else {
         $data['publish_date'] = null;
     }
-
-
 
     $berita->update($data);
 

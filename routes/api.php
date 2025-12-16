@@ -8,6 +8,7 @@ use App\Http\Controllers\GaleriController;
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\TentangkamiController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DashboardController;
 
 
 Route::apiResource('berita', BeritaController::class);
@@ -19,6 +20,7 @@ Route::post('/galeri/{id}/update', [GaleriController::class, 'update']);
 Route::apiResource('tentang-kami', TentangkamiController::class);
 Route::apiResource('program', ProgramController::class);
 Route::post('/program/{id}/update', [ProgramController::class, 'update']);
+Route::get('/dashboard/count', [DashboardController::class, 'count']);
 
 
 Route::get('/sso/callback', [AuthController::class, 'callback']);
