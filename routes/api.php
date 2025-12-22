@@ -25,4 +25,5 @@ Route::middleware(['sso:1'])->group(function () {
 Route::prefix('sso')->group(function () {
     Route::get('/callback', [AuthController::class, 'callback']);
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::post('/login', [AuthController::class, 'login']);
 });

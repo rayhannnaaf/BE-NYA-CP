@@ -7,6 +7,8 @@ use App\Models\SsoToken;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Firebase\JWT\JWT;
+use Carbon\Carbon;
+use App\Http\Requests\Auth\LoginRules;
 use Exception;
 
 class AuthController extends Controller
@@ -76,6 +78,50 @@ class AuthController extends Controller
             $url = env('APP_URL_FE') . '/sso/callback?token=' . $localToken;
 
             return redirect()->away($url);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function login(loginRules $request)
+    {
+        try {
+            $request->validated();
+
+            $resp = Http::post(env('SSO_PORTAL_BASE_URL') . '/api/login', $request->all());
+
+            if ($resp->failed()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => $resp->body(),
+                    'status_code' => $resp->status(),
+                ], 401);
+            }
+
+            $response = $resp->json('data');
+
+            $user           = $response['user'];
+            $original_token = $response['original_token'];
+            $expires_at     = Carbon::parse($response['expires_at'])->toDateTimeString();
+
+            SsoToken::create([
+                'user_id'        => $user['id'],
+                'role_id'        => $user['role']['id'],
+                'tahun_ajaran'   => $user['config']['academic_year'],
+                'semester'       => $user['config']['semester'],
+                'original_token' => $original_token,
+                'expires_at'     => $expires_at,
+                'revoked'        => false,
+            ]);
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Login successful',
+                'data' => $response
+            ]);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => false,
