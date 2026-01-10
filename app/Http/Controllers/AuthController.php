@@ -198,6 +198,93 @@ class AuthController extends Controller
         ]);
     }
 
+    public function refresh(Request $request)
+    {
+        $request->validate([
+            'refresh_token' => 'required'
+        ]);
+
+        try {
+            /**
+             * 1. Ambil token dari DB
+             */
+            $tokenDb = SsoToken::where('refresh_token', $request->refresh_token)
+                ->where('revoked', false)
+                ->first();
+
+            if (!$tokenDb) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Invalid refresh token'
+                ], 401);
+            }
+
+            /**
+             * 2. Cek refresh expired (DB)
+             */
+            if (Carbon::parse($tokenDb->refresh_expires_at)->isPast()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Refresh token expired'
+                ], 401);
+            }
+
+            /**
+             * 3. Call portal refresh-token
+             */
+            $resp = Http::timeout(10)->post(
+                env('SSO_PORTAL_BASE_URL') . '/api/refresh-token',
+                [
+                    'refresh_token' => $request->refresh_token
+                ]
+            );
+
+            if (!$resp->successful()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Portal refresh token failed'
+                ], 400);
+            }
+
+            $data = $resp->json();
+
+            /**
+             * 4. Validasi response portal
+             */
+            if (
+                !isset($data['access_token']) ||
+                !isset($data['expires_at'])
+            ) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Invalid refresh response from portal'
+                ], 400);
+            }
+
+            /**
+             * 5. Update token DB
+             */
+            $tokenDb->update([
+                'original_token' => $data['access_token'],
+                'expires_at'     => Carbon::parse($data['expires_at']),
+            ]);
+
+            /**
+             * 6. Response sukses
+             */
+            return response()->json([
+                'access_token' => $tokenDb->original_token,
+                'expires_at'   => $tokenDb->expires_at,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Internal Server Error',
+                'detail'  => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function testService(Request $request)
     {
         $userId = $request->sso_user_id;
