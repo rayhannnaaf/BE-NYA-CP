@@ -30,7 +30,7 @@ Route::middleware(['sso:1'])->group(function () {
 });
 
 Route::prefix('sso')->group(function () {
-    Route::get('/sso/callback', [AuthController::class, 'callback']);
+    Route::get('/callback', [AuthController::class, 'callback']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/refresh', [AuthController::class, 'refresh']);

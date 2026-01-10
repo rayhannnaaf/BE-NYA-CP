@@ -55,26 +55,28 @@ class AuthController extends Controller
             }
 
             $user = $resp->json('user');
-            $original_token = $resp->json('token');
-            $expires_at = $resp->json('expires_at');
+            $token = $resp->json('token');
 
             SsoToken::create([
-                'user_id'        => $user['id'],
-                'role_id'        => $user['role']['id'],
-                'tahun_ajaran'   => $user['config']['academic_year'],
-                'semester'       => $user['config']['semester'],
-                'original_token' => $original_token,
-                'expires_at'     => $expires_at,
-                'revoked'        => false,
+                'user_id'               => $user['id'],
+                'role_id'               => $user['role']['id'],
+                'tahun_ajaran'          => $user['config']['academic_year'],
+                'semester'              => $user['config']['semester'],
+                'original_token'        => $token['access_token'],
+                'expires_at'            => $token['expires_at'],
+                'refresh_token'         => $token['refresh_token'],
+                'refresh_expires_at'    => $token['refresh_expires_at'],
+                'revoked'               => false,
             ]);
 
             // Generate JWT local token FE
             $payload = [
-                'user' => $user,
-                'original_token' => $original_token,
-                'portal_token' => $resp->json('portal_token'),
-                'iat' => time(),
-                'exp' => $expires_at,
+                'user'          => $user,
+                'original_token'=> $token['access_token'],
+                'refresh_token' => $token['refresh_token'],
+                'iat'           => time(),
+                'exp'           => $token['expires_at'],
+                'refresh_exp'   => $token['refresh_expires_at']
             ];
 
             $jwtSecret = env('JWT_SECRET');
