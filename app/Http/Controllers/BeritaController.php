@@ -66,12 +66,6 @@ class BeritaController extends Controller
 
     public function store(Request $request)
     {
-        if (empty($validated)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Form data kosong'
-            ], 422);
-        }
         
         $validated = $request->validate([
             'judul'        => 'required|string',
