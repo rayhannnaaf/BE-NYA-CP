@@ -28,6 +28,8 @@ class GaleriController extends Controller
         if (!$galeri) {
             return response()->json(['message' => 'Galeri not found'], 404);
         }
+
+        $galeri->media_url = $galeri->media ? url('storage/' . $galeri->media) : null;
         return response()->json([
             'success' => true,
             'message' => 'Detail berita ditemukan',
@@ -85,25 +87,24 @@ class GaleriController extends Controller
             'judul' => 'string|max:255',
             'deskripsi' => 'nullable|string',
             'media' => 'required|file|mimes:jpg,jpeg,png,mp4,mov,avi|max:102400',
-            'tipe_media ' => 'string',
+            'tipe_media' => 'required|in:gambar,vidio',
             'tanggal' => 'nullable|date',
         ]);
 
         if ($request->hasFile('media')) {
 
             if ($galeri->media) {
-                $oldPath = str_replace('/storage/', '', $galeri->media);
-                Storage::disk('public')->delete($oldPath);
+                Storage::disk('public')->delete($galeri->media);
             }
 
             $folder = 'galeri/' . date('Y') . '/' . date('m') . '/' . date('d');
             $path = $request->file('media')->store($folder, 'public');
 
-            $validated['media'] = url('storage/' . $path);
+            // SIMPAN PATH SAJA
+            $validated['media'] = $path;
         } else {
             $validated['media'] = $galeri->media;
         }
-
 
         $galeri->update($validated);
 
