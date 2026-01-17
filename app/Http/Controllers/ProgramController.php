@@ -53,9 +53,9 @@ class ProgramController extends Controller
                 'errors' => $validator->errors()
             ], 422);
         }
-    
+
         $validatedData = $validator->validated();
-    
+
         if (!$request->hasFile('media')) {
             return response()->json([
                 'status' => false,
@@ -77,48 +77,60 @@ class ProgramController extends Controller
 
     public function update(Request $request, $id)
     {
-        $data = program::find($id);
+        $data = Program::find($id);
 
         if (!$data) {
-            return response()->json(['status' => false, 'message' => 'Data tidak ditemukan'], 404);
+            return response()->json([
+                'status' => false,
+                'message' => 'Data tidak ditemukan'
+            ], 404);
         }
 
         $validator = Validator::make($request->all(), [
             'nama'        => 'nullable|string|max:255',
-            'deskripsi'   => 'nullable',
+            'deskripsi'   => 'nullable|string',
             'tanggal'     => 'nullable|date',
             'tipe_media'  => 'nullable|in:gambar,vidio',
             'media'       => 'nullable|file|mimes:jpg,jpeg,png,mp4,mov,avi|max:102400',
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['status' => false, 'errors' => $validator->errors()], 422);
+            return response()->json([
+                'status' => false,
+                'errors' => $validator->errors()
+            ], 422);
         }
 
-        $validatedData = $validator->validated();
+        $validated = $validator->validated();
 
+        /* ======================
+     | HANDLE FILE UPLOAD
+     ====================== */
         if ($request->hasFile('media')) {
 
+            // hapus file lama
             if ($data->media) {
-                $oldPath = str_replace('/storage/', '', $data->media);
-                Storage::disk('public')->delete($oldPath);
+                Storage::disk('public')->delete($data->media);
             }
-    
-            $folder = 'program/' . date('Y') . '/' . date('m') . '/' . date('d');
+
+            $folder = 'program/' . date('Y/m/d');
             $path = $request->file('media')->store($folder, 'public');
-    
-            $validated['media'] = url('storage/' . $path);
-    
-        } else {
-            $validated['media'] = $data->media;
+
+            // SIMPAN PATH SAJA
+            $validated['media'] = $path;
         }
 
-        $data->update($validatedData);
+        $data->update($validated);
 
         return response()->json([
             'status' => true,
             'message' => 'Data berhasil diperbarui',
-            'data' => $data
+            'data' => [
+                ...$data->toArray(),
+                'media_url' => $data->media
+                    ? url('storage/' . $data->media)
+                    : null
+            ]
         ]);
     }
 

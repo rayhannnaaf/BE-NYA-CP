@@ -2,15 +2,22 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
 use App\Models\SsoToken;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Firebase\JWT\JWT;
+use Carbon\Carbon;
+use App\Services\SsoService;
+use App\Http\Requests\Auth\LoginRules;
 use Exception;
 
 class AuthController extends Controller
 {
+    protected $ssoService;
+    public function __construct(SsoService $ssoService)
+    {
+        $this->ssoService = $ssoService;
+    }
     public function callback(Request $r)
     {
         try {
@@ -48,8 +55,64 @@ class AuthController extends Controller
             }
 
             $user = $resp->json('user');
-            $original_token = $resp->json('token');
-            $expires_at = $resp->json('expires_at');
+            $token = $resp->json('token');
+
+            SsoToken::create([
+                'user_id'               => $user['id'],
+                'role_id'               => $user['role']['id'],
+                'tahun_ajaran'          => $user['config']['academic_year'],
+                'semester'              => $user['config']['semester'],
+                'original_token'        => $token['access_token'],
+                'expires_at'            => $token['expires_at'],
+                'refresh_token'         => $token['refresh_token'],
+                'refresh_expires_at'    => $token['refresh_expires_at'],
+                'revoked'               => false,
+            ]);
+
+            // Generate JWT local token FE
+            $payload = [
+                'user'          => $user,
+                'original_token'=> $token['access_token'],
+                'refresh_token' => $token['refresh_token'],
+                'iat'           => time(),
+                'exp'           => $token['expires_at'],
+                'refresh_exp'   => $token['refresh_expires_at']
+            ];
+
+            $jwtSecret = env('JWT_SECRET');
+            $localToken = JWT::encode($payload, $jwtSecret, 'HS256');
+
+            $url = env('APP_URL_FE') . '/sso/callback?token=' . $localToken;
+
+            return redirect()->away($url);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function login(loginRules $request)
+    {
+        try {
+            $request->validated();
+
+            $resp = Http::post(env('SSO_PORTAL_BASE_URL') . '/api/login', $request->all());
+
+            if ($resp->failed()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => $resp->body(),
+                    'status_code' => $resp->status(),
+                ], 401);
+            }
+
+            $response = $resp->json('data');
+
+            $user           = $response['user'];
+            $original_token = $response['original_token'];
+            $expires_at     = Carbon::parse($response['expires_at'])->toDateTimeString();
 
             SsoToken::create([
                 'user_id'        => $user['id'],
@@ -61,21 +124,11 @@ class AuthController extends Controller
                 'revoked'        => false,
             ]);
 
-            // Generate JWT local token FE
-            $payload = [
-                'user' => $user,
-                'original_token' => $original_token,
-                'portal_token' => $resp->json('portal_token'),
-                'iat' => time(),
-                'exp' => $expires_at,
-            ];
-
-            $jwtSecret = env('JWT_SECRET');
-            $localToken = JWT::encode($payload, $jwtSecret, 'HS256');
-
-            $url = env('APP_URL_FE') . '/sso/callback?token=' . $localToken;
-
-            return redirect()->away($url);
+            return response()->json([
+                'status' => true,
+                'message' => 'Login successful',
+                'data' => $response
+            ]);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => false,
@@ -144,6 +197,110 @@ class AuthController extends Controller
             'status' => true,
             'message' => 'Logout successful',
             'redirect' => env('SSO_PORTAL_BASE_URL') . '/'
+        ]);
+    }
+
+    public function refresh(Request $request)
+    {
+        $request->validate([
+            'refresh_token' => 'required'
+        ]);
+
+        try {
+            /**
+             * 1. Ambil token dari DB
+             */
+            $tokenDb = SsoToken::where('refresh_token', $request->refresh_token)
+                ->where('revoked', false)
+                ->first();
+
+            if (!$tokenDb) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Invalid refresh token'
+                ], 401);
+            }
+
+            /**
+             * 2. Cek refresh expired (DB)
+             */
+            if (Carbon::parse($tokenDb->refresh_expires_at)->isPast()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Refresh token expired'
+                ], 401);
+            }
+
+            /**
+             * 3. Call portal refresh-token
+             */
+            $resp = Http::timeout(10)->post(
+                env('SSO_PORTAL_BASE_URL') . '/api/refresh-token',
+                [
+                    'refresh_token' => $request->refresh_token
+                ]
+            );
+
+            if (!$resp->successful()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Portal refresh token failed'
+                ], 400);
+            }
+
+            $data = $resp->json();
+
+            /**
+             * 4. Validasi response portal
+             */
+            if (
+                !isset($data['access_token']) ||
+                !isset($data['expires_at'])
+            ) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Invalid refresh response from portal'
+                ], 400);
+            }
+
+            /**
+             * 5. Update token DB
+             */
+            $tokenDb->update([
+                'original_token' => $data['access_token'],
+                'expires_at'     => Carbon::parse($data['expires_at']),
+            ]);
+
+            /**
+             * 6. Response sukses
+             */
+            return response()->json([
+                'access_token' => $tokenDb->original_token,
+                'expires_at'   => $tokenDb->expires_at,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Internal Server Error',
+                'detail'  => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function testService(Request $request)
+    {
+        $userId = $request->sso_user_id;
+        $roleId = $request->sso_role_id;
+        $tahunAjaran = $request->sso_tahun_ajaran;
+        $semester = $request->sso_semester;
+
+        $dataClassroom = $this->ssoService->getDataClassRoom($userId);
+        $dataUser = $this->ssoService->getDataUserById($userId);
+
+        return response()->json([
+            "status" => true,
+            "message" => "Success",
+            "data" => $dataUser
         ]);
     }
 }

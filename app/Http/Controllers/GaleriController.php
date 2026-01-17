@@ -28,7 +28,13 @@ class GaleriController extends Controller
         if (!$galeri) {
             return response()->json(['message' => 'Galeri not found'], 404);
         }
-        return response()->json($galeri);
+
+        $galeri->media_url = $galeri->media ? url('storage/' . $galeri->media) : null;
+        return response()->json([
+            'success' => true,
+            'message' => 'Detail berita ditemukan',
+            'data' => $galeri
+        ], 200);
     }
 
     public function store(Request $request)
@@ -36,9 +42,9 @@ class GaleriController extends Controller
         $validated = $request->validate([
             'judul' => 'required|string|max:255',
             'deskripsi' => 'nullable|string',
-            'media' => 'required|file|mimes:jpg,jpeg,png,mp4,mov,avi|max:102400',  
-            'tipe_media' => 'required|in:gambar,vidio', 
-            'tanggal' => 'nullable|date', 
+            'media' => 'required|file|mimes:jpg,jpeg,png,mp4,mov,avi|max:102400',
+            'tipe_media' => 'required|in:gambar,vidio',
+            'tanggal' => 'nullable|date',
         ]);
 
         if (!$request->hasFile('media')) {
@@ -47,7 +53,7 @@ class GaleriController extends Controller
                 'message' => 'File media wajib dikirim'
             ], 400);
         }
-    
+
 
         $folder = 'galeri/' . date('Y') . '/' . date('m') . '/' . date('d');
         $path = $request->file('media')->store($folder, 'public');
@@ -59,7 +65,7 @@ class GaleriController extends Controller
             'deskripsi' => $request['deskripsi'],
             'media' => $path,
             'tipe_media' => $request['tipe_media'],
-            'tanggal' => $request['tanggal'] ?? now(), 
+            'tanggal' => $request['tanggal'] ?? now(),
         ]);
 
         $galeri->media_url = url('storage/' . $galeri->media);
@@ -67,7 +73,7 @@ class GaleriController extends Controller
         return response()->json([
             'message' => 'Galeri berhasil disimpan',
             'data' => $galeri
-        ], 201); 
+        ], 201);
     }
 
     public function update(Request $request, $id)
@@ -80,28 +86,25 @@ class GaleriController extends Controller
         $validated = $request->validate([
             'judul' => 'string|max:255',
             'deskripsi' => 'nullable|string',
-            'media' => 'required|file|mimes:jpg,jpeg,png,mp4,mov,avi|max:102400', 
-            'tipe_media '=>'string',
-            'tanggal' => 'nullable|date', 
+            'media' => 'required|file|mimes:jpg,jpeg,png,mp4,mov,avi|max:102400',
+            'tipe_media' => 'required|in:gambar,vidio',
+            'tanggal' => 'nullable|date',
         ]);
 
         if ($request->hasFile('media')) {
 
             if ($galeri->media) {
-                $oldPath = str_replace('/storage/', '', $galeri->media);
-                Storage::disk('public')->delete($oldPath);
+                Storage::disk('public')->delete($galeri->media);
             }
-    
+
             $folder = 'galeri/' . date('Y') . '/' . date('m') . '/' . date('d');
             $path = $request->file('media')->store($folder, 'public');
-    
-            $validated['media'] = url('storage/' . $path);
-    
-    
+
+            // SIMPAN PATH SAJA
+            $validated['media'] = $path;
         } else {
             $validated['media'] = $galeri->media;
         }
-    
 
         $galeri->update($validated);
 

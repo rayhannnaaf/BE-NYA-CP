@@ -66,7 +66,7 @@ class BeritaController extends Controller
 
     public function store(Request $request)
     {
-        
+
         $validated = $request->validate([
             'judul'        => 'required|string',
             'isi'          => 'required|string',
@@ -77,8 +77,6 @@ class BeritaController extends Controller
             'publish_date' => 'nullable|date'
         ]);
 
-        
-        
         $slug = Str::slug($validated['judul'], '-');
         $count = berita::where('slug', 'LIKE', "{$slug}%")->count();
         if ($count > 0) {
@@ -92,13 +90,11 @@ class BeritaController extends Controller
         $validated['slug'] = $slug;
         $validated['publish_date'] = $request->publish_date ?? now();
 
-        
 
         $berita = berita::create($validated);
 
         $berita->media_url = url('storage/' . $berita->media);
 
-        
         return response()->json([
             'success' => true,
             'message' => 'Berita berhasil ditambahkan',
@@ -109,7 +105,7 @@ class BeritaController extends Controller
     public function update(Request $request, $id)
     {
 
-        
+
         $berita = berita::find($id);
 
         if (!$berita) {
@@ -167,7 +163,7 @@ class BeritaController extends Controller
                 'message' => 'Form data kosong'
             ], 422);
         }
-        
+
 
         return response()->json([
             'success' => true,
